@@ -369,11 +369,27 @@ async def api_summary(request: Request) -> JSONResponse:
 async def emit_three_events(ctx: Context = None) -> str:
     """
     Emits exactly 3 SSE events on the /mcp stream for a single tools/call:
-      1. ProgressNotification  (event 1)
-      2. LoggingMessageNotification  (event 2)
-      3. Final JSON-RPC tool result  (event 3)
+      1. ProgressNotification         (event 1)
+      2. LoggingMessageNotification   (event 2)
+      3. Final JSON-RPC tool result   (event 3)
+
+    Sends the progress notification directly via the low-level session with a
+    server-supplied progressToken and related_request_id, so all 3 frames are
+    emitted on this request's SSE response even when the client didn't include
+    _meta.progressToken.
     """
-    await ctx.report_progress(progress=1, total=2, message="Event 1: progress notification")
+    progress_token = (
+        ctx.request_context.meta.progressToken
+        if ctx.request_context.meta and ctx.request_context.meta.progressToken is not None
+        else "emit-three-events"
+    )
+    await ctx.session.send_progress_notification(
+        progress_token=progress_token,
+        progress=1,
+        total=2,
+        message="Event 1: progress notification",
+        related_request_id=ctx.request_id,
+    )
     await ctx.log("info", "Event 2: logging notification", logger_name="emit_three_events")
     return "Event 3: final tool result"
 
