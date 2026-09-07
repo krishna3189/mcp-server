@@ -251,17 +251,62 @@ async def api_test_burst(request: Request) -> JSONResponse:
 
 @mcp.custom_route("/api/test/sse-events", methods=["GET"])
 async def api_test_sse_events(request: Request):
-    """Streams exactly 3 events as a real Server-Sent Events (text/event-stream) response."""
+    """
+    Streams JSON-RPC 2.0 messages as Server-Sent Events (text/event-stream).
+
+    Emits, in order:
+      1. notifications/progress   — JSON-RPC notification (no id)
+      2. notifications/message    — JSON-RPC notification (no id)
+      3. tools/call response      — JSON-RPC response (with id, matches request_id)
+    """
+    request_id = request.query_params.get("id", "1")
+    progress_token = request.query_params.get("progressToken", "sse-events-demo")
+
     async def event_stream():
-        events = [
-            {"event": "start",    "data": {"step": 1, "message": "First event"}},
-            {"event": "progress", "data": {"step": 2, "message": "Second event"}},
-            {"event": "complete", "data": {"step": 3, "message": "Third event"}},
+        messages = [
+            {
+                "event": "message",
+                "payload": {
+                    "jsonrpc": "2.0",
+                    "method": "notifications/progress",
+                    "params": {
+                        "progressToken": progress_token,
+                        "progress": 1,
+                        "total": 2,
+                        "message": "First event: progress notification",
+                    },
+                },
+            },
+            {
+                "event": "message",
+                "payload": {
+                    "jsonrpc": "2.0",
+                    "method": "notifications/message",
+                    "params": {
+                        "level": "info",
+                        "logger": "sse-events",
+                        "data": "Second event: logging notification",
+                    },
+                },
+            },
+            {
+                "event": "message",
+                "payload": {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "content": [
+                            {"type": "text", "text": "Third event: final tool result"},
+                        ],
+                        "isError": False,
+                    },
+                },
+            },
         ]
-        for i, ev in enumerate(events, start=1):
+        for i, msg in enumerate(messages, start=1):
             yield f"id: {i}\n"
-            yield f"event: {ev['event']}\n"
-            yield f"data: {json.dumps(ev['data'])}\n\n"
+            yield f"event: {msg['event']}\n"
+            yield f"data: {json.dumps(msg['payload'])}\n\n"
             await asyncio.sleep(0.3)
 
     return StreamingResponse(
