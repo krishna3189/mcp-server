@@ -320,6 +320,52 @@ async def api_test_sse_events(request: Request):
     )
 
 
+@mcp.custom_route("/api/test/sse-events-result", methods=["GET"])
+async def api_test_sse_events_result(request: Request):
+    """
+    Streams 3 JSON-RPC `tools/call` result frames as Server-Sent Events.
+
+    Every frame is a JSON-RPC 2.0 response shaped like a tools/call result
+    (id + result.content[]). Frame ids start at ?startId=N (default 1) and
+    increment by 1 for each frame.
+    """
+    try:
+        start_id = int(request.query_params.get("startId", "1"))
+    except ValueError:
+        start_id = 1
+
+    async def event_stream():
+        payloads = [
+            {"text": "First tool result", "step": 1},
+            {"text": "Second tool result", "step": 2},
+            {"text": "Third tool result", "step": 3},
+        ]
+        for i, p in enumerate(payloads):
+            frame = {
+                "jsonrpc": "2.0",
+                "id": start_id + i,
+                "result": {
+                    "content": [{"type": "text", "text": p["text"]}],
+                    "structuredContent": {"step": p["step"]},
+                    "isError": False,
+                },
+            }
+            yield f"id: {i + 1}\n"
+            yield f"event: message\n"
+            yield f"data: {json.dumps(frame)}\n\n"
+            await asyncio.sleep(0.3)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @mcp.custom_route("/api/test/cancellation-hint", methods=["GET"])
 async def api_test_cancellation_hint(request: Request) -> JSONResponse:
     """Shows how to test CancelledNotification from Postman."""
@@ -356,6 +402,7 @@ async def api_summary(request: Request) -> JSONResponse:
             "GET /api/test/elicit-complete?outcome=...":"ElicitCompleteNotification",
             "GET /api/test/burst":                      "ALL 7 notifications in one call",
             "GET /api/test/sse-events":                 "Streams exactly 3 events as text/event-stream (SSE)",
+            "GET /api/test/sse-events-result":          "Streams 3 tools/call result-shaped JSON-RPC frames (SSE)",
             "GET /api/test/cancellation-hint":           "How to test CancelledNotification",
         },
     })
