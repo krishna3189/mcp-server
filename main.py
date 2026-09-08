@@ -19,7 +19,6 @@ from mcp.server.fastmcp import FastMCP, Context
 from mcp.types import (
     ElicitResult,
     GetPromptResult,
-    CreateMessageRequest,
     SamplingMessage,
     TextContent,
     Completion,
@@ -458,19 +457,17 @@ async def cancellable_op(ctx: Context = None) -> str:
 async def greet(name: str = "World", ctx: Context = None) -> str:
     """Greet someone using LLM sampling"""
     result = await ctx.session.create_message(
-        CreateMessageRequest(
-            messages=[
-                SamplingMessage(
-                    role="user",
-                    content=TextContent(
-                        type="text",
-                        text=f"Write a short, warm greeting for someone named {name}.",
-                    ),
-                )
-            ],
-            systemPrompt="You are a friendly assistant. Keep it to one sentence.",
-            maxTokens=100,
-        )
+        messages=[
+            SamplingMessage(
+                role="user",
+                content=TextContent(
+                    type="text",
+                    text=f"Write a short, warm greeting for someone named {name}.",
+                ),
+            )
+        ],
+        system_prompt="You are a friendly assistant. Keep it to one sentence.",
+        max_tokens=100,
     )
     return result.content.text
 
@@ -479,18 +476,16 @@ async def greet(name: str = "World", ctx: Context = None) -> str:
 async def add(a: int, b: int, ctx: Context = None) -> str:
     """Add two numbers and explain the result via LLM"""
     result = await ctx.session.create_message(
-        CreateMessageRequest(
-            messages=[
-                SamplingMessage(
-                    role="user",
-                    content=TextContent(
-                        type="text",
-                        text=f"Explain in one friendly sentence what {a} + {b} equals.",
-                    ),
-                )
-            ],
-            maxTokens=60,
-        )
+        messages=[
+            SamplingMessage(
+                role="user",
+                content=TextContent(
+                    type="text",
+                    text=f"Explain in one friendly sentence what {a} + {b} equals.",
+                ),
+            )
+        ],
+        max_tokens=60,
     )
     return result.content.text
 
